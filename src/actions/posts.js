@@ -11,8 +11,10 @@ export const getPosts = () => async (dispatch) => {
   try {
     const { data } = await api.fetchPosts();
     dispatch(fetchAll(data));
+    return data;
   } catch (error) {
     console.error("Error fetching posts:", error.message);
+    throw error;
   }
 };
 
@@ -21,8 +23,10 @@ export const createNewPost = (post) => async (dispatch) => {
   try {
     const { data } = await api.createPost(post);
     dispatch(createPost(data));
+    return data;
   } catch (error) {
     console.error("Error creating post:", error.message);
+    throw error;
   }
 };
 
@@ -31,8 +35,10 @@ export const updatePost = (id, post) => async (dispatch) => {
   try {
     const { data } = await api.updatePost(id, post);
     dispatch(updatePostInSlice(data));
+    return data;
   } catch (error) {
     console.error("Error updating post:", error.message);
+    throw error;
   }
 };
 
@@ -43,6 +49,7 @@ export const deletePost = (id) => async (dispatch) => {
     dispatch(removePost(id));
   } catch (error) {
     console.error("Error deleting post:", error.message);
+    throw error;
   }
 };
 
@@ -51,7 +58,9 @@ export const likePost = (id) => async (dispatch) => {
   try {
     const { data } = await api.likePost(id);
     dispatch(updatePostInSlice(data));
+    return data;
   } catch (error) {
     console.error("Error liking post:", error.message);
+    throw error;
   }
 };

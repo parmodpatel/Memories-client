@@ -1,24 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
-import { useDispatch } from 'react-redux';
-import { getPosts } from './actions/posts';
-import Posts from "./components/Posts";
-import Form from "./components/Form";
+import { useDispatch } from "react-redux";
+import { getPosts } from "./actions/posts";
 import Auth from "./components/Auth";
-import memories from './images/memories.png'
-import "./index.css";
+import Form from "./components/Form";
+import Posts from "./components/Posts";
 import { fetchMe, signOut } from "./api";
+import memories from "./images/memories.png";
+import "./index.css";
 
 const App = () => {
   const [currentId, setCurrentId] = useState(null);
   const [auth, setAuth] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState("");
   const dispatch = useDispatch();
 
   const isAuthed = Boolean(auth?.user);
   const user = useMemo(() => auth?.user || null, [auth]);
+  const displayName = user?.name || user?.email || "User";
 
   useEffect(() => {
     let isMounted = true;
+    const fallbackTimer = window.setTimeout(() => {
+      if (isMounted) {
+        setAuth(null);
+        setIsLoadingAuth(false);
+      }
+    }, 7000);
 
     const loadSession = async () => {
       try {
@@ -26,12 +35,13 @@ const App = () => {
         if (isMounted) {
           setAuth({ user: data });
         }
-      } catch (error) {
+      } catch (_error) {
         if (isMounted) {
           setAuth(null);
         }
       } finally {
         if (isMounted) {
+          window.clearTimeout(fallbackTimer);
           setIsLoadingAuth(false);
         }
       }
@@ -41,13 +51,30 @@ const App = () => {
 
     return () => {
       isMounted = false;
+      window.clearTimeout(fallbackTimer);
     };
   }, []);
 
   useEffect(() => {
-    if (isAuthed) {
-      dispatch(getPosts());
+    if (!isAuthed) {
+      return;
     }
+
+    const loadPosts = async () => {
+      setPostsLoading(true);
+      setPostsError("");
+      try {
+        await dispatch(getPosts());
+      } catch (error) {
+        setPostsError(
+          error?.response?.data?.message || "Unable to load memories."
+        );
+      } finally {
+        setPostsLoading(false);
+      }
+    };
+
+    loadPosts();
   }, [currentId, dispatch, isAuthed]);
 
   const handleLogin = (nextAuth) => {
@@ -57,53 +84,65 @@ const App = () => {
   const handleLogout = async () => {
     try {
       await signOut();
-    } catch (error) {
-      // best-effort logout
+    } catch (_error) {
+      // Logout still clears the UI session even if the server call fails.
     }
+
     setAuth(null);
   };
 
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Checking your session...
-      </div>
+      <main className="auth-shell grid place-items-center px-4">
+        <div className="auth-card px-5 py-4 text-sm font-semibold text-slate-600">
+          Checking your session...
+        </div>
+      </main>
     );
   }
 
   if (!isAuthed) {
     return <Auth onAuth={handleLogin} />;
   }
-  
+
   return (
-    <div className="max-w-7xl mx-auto p-4 ">
-      <div className="flex items-center justify-between mt-2">
-        <div className="text-sm text-gray-500">
-          Signed in as <span className="font-semibold text-gray-700">{user?.name}</span>
-        </div>
-        <button
-          className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
-          onClick={handleLogout}
-          type="button"
-        >
-          Log out
-        </button>
-      </div>
+    <main className="app-shell">
+      <div className="page-wrap">
+        <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-lg border border-teal-300/20 bg-teal-300/10">
+              <img src={memories} alt="Memories" className="h-8 w-8 object-contain" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-normal text-white">
+                Memories
+              </h1>
+              <p className="text-sm text-zinc-400">
+                Signed in as{" "}
+                <span className="font-medium text-teal-200">{displayName}</span>
+              </p>
+            </div>
+          </div>
 
-      <div className="bg-white rounded-xl flex flex-row justify-center items-center my-8 shadow-lg p-4">
-        <h2 className="text-4xl text-blue-500 font-bold text-center">Memories</h2>
-        <img className="ml-4 h-14" src={memories} alt="memories" />
-      </div>
+          <button className="btn-secondary w-full sm:w-auto" onClick={handleLogout}>
+            Log out
+          </button>
+        </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <Posts setCurrentId={setCurrentId} user={user} />
-        </div>
-        <div>
-          <Form currentId={currentId} setCurrentId={setCurrentId} user={user} />
-        </div>
+        <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <Posts
+            isLoading={postsLoading}
+            error={postsError}
+            setCurrentId={setCurrentId}
+            user={user}
+          />
+
+          <aside className="lg:sticky lg:top-6 lg:self-start">
+            <Form currentId={currentId} setCurrentId={setCurrentId} user={user} />
+          </aside>
+        </section>
       </div>
-    </div>
+    </main>
   );
 };
 

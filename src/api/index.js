@@ -1,10 +1,12 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_TIMEOUT = Number(process.env.REACT_APP_API_TIMEOUT) || 12000;
 
 const API = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  timeout: API_TIMEOUT,
 });
 
 export const fetchPosts = () => API.get("/posts");
@@ -22,7 +24,7 @@ export const signUp = (payload) => API.post("/auth/signup", payload);
 
 export const signIn = (payload) => API.post("/auth/login", payload);
 
-export const fetchMe = () => API.get("/auth/me");
+export const fetchMe = () => API.get("/auth/me", { timeout: 6000 });
 
 export const signOut = () => API.post("/auth/logout");
 

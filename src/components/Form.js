@@ -3,60 +3,95 @@ import { useDispatch, useSelector } from "react-redux";
 import { createNewPost, updatePost } from "../actions/posts";
 import { getCloudinarySignature } from "../api";
 
+const emptyPost = {
+  title: "",
+  message: "",
+  tags: "",
+  selectedFile: "",
+  imageUrl: "",
+  imagePublicId: "",
+};
+
 const Form = ({ currentId, setCurrentId, user }) => {
-  const [postData, setPostData] = useState({
-    title: "",
-    message: "",
-    tags: "",
-    selectedFile: "",
-    imageUrl: "",
-    imagePublicId: "",
-  });
+  const [postData, setPostData] = useState(emptyPost);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const post = useSelector((state) => currentId ? state.posts.find((p) => p._id === currentId): null);
+  const [submitError, setSubmitError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const post = useSelector((state) =>
+    currentId ? state.posts.find((item) => item._id === currentId) : null
+  );
   const dispatch = useDispatch();
 
   useEffect(() => {
-    if (post) setPostData(post);
+    if (post) {
+      setPostData({
+        ...emptyPost,
+        ...post,
+        tags: Array.isArray(post.tags) ? post.tags.join(", ") : post.tags || "",
+      });
+    }
   }, [post]);
 
   const normalizeTags = (tagsValue) => {
     if (Array.isArray(tagsValue)) {
       return tagsValue;
     }
+
     return tagsValue
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
   };
 
-  const canSubmit = useMemo(() => !uploading, [uploading]);
+  const titleReady = postData.title.trim().length > 0;
+  const messageReady = postData.message.trim().length > 0;
+  const canSubmit = useMemo(
+    () => titleReady && messageReady && !uploading && !isSaving,
+    [isSaving, messageReady, titleReady, uploading]
+  );
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const resetForm = () => {
+    setCurrentId(null);
+    setPostData(emptyPost);
+    setSubmitError("");
+    setUploadError("");
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!canSubmit) {
+      setSubmitError("Title and message are required.");
+      return;
+    }
+
     const payload = {
       ...postData,
       tags: normalizeTags(postData.tags),
     };
-    if (currentId) {
-      dispatch(updatePost(currentId, payload));
-    } else {
-      dispatch(createNewPost(payload));
+
+    setIsSaving(true);
+    setSubmitError("");
+
+    try {
+      if (currentId) {
+        await dispatch(updatePost(currentId, payload));
+      } else {
+        await dispatch(createNewPost(payload));
+      }
+      resetForm();
+    } catch (error) {
+      setSubmitError(
+        error?.response?.data?.message || "Unable to save this memory."
+      );
+    } finally {
+      setIsSaving(false);
     }
-    setCurrentId(null);
-    setPostData({
-      title: "",
-      message: "",
-      tags: "",
-      selectedFile: "",
-      imageUrl: "",
-      imagePublicId: "",
-    });
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
     if (!file) return;
 
     setUploadError("");
@@ -85,25 +120,10 @@ const Form = ({ currentId, setCurrentId, user }) => {
         }
       );
 
-      let uploadData = null;
-      let uploadText = "";
-      try {
-        uploadData = await uploadResponse.json();
-      } catch (parseError) {
-        uploadData = null;
-        try {
-          uploadText = await uploadResponse.text();
-        } catch (textError) {
-          uploadText = "";
-        }
-      }
+      const uploadData = await uploadResponse.json();
+
       if (!uploadResponse.ok) {
-        const message =
-          uploadData?.error?.message ||
-          uploadData?.message ||
-          uploadText ||
-          `Upload failed (status ${uploadResponse.status}).`;
-        throw new Error(message);
+        throw new Error(uploadData?.error?.message || "Upload failed.");
       }
 
       setPostData((prev) => ({
@@ -113,73 +133,120 @@ const Form = ({ currentId, setCurrentId, user }) => {
         selectedFile: "",
       }));
     } catch (error) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to upload image. Try again.";
-      setUploadError(message);
+      setUploadError(error?.message || "Unable to upload image.");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="max-w-sm w-full bg-white shadow-lg rounded-lg p-6 mx-auto mb-6">
-      <h2 className="text-xl font-semibold mb-4 text-center">
-        {currentId ? "Editing" : "Creating"} a Memory
-      </h2>
-      <p className="text-xs text-gray-500 text-center mb-3">
-        Posting as {user?.name || user?.email || "you"}
+    <section className="dash-form-card p-5 pt-7">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-teal-700">
+            {currentId ? "Edit memory" : "New memory"}
+          </p>
+          <h2 className="mt-1 text-xl font-extrabold text-slate-950">
+            {currentId ? "Refine the details" : "Capture a moment"}
+          </h2>
+        </div>
+        {currentId && (
+          <button type="button" className="dash-secondary" onClick={resetForm}>
+            Cancel
+          </button>
+        )}
+      </div>
+
+      <p className="mb-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600">
+        Posting as{" "}
+        <span className="font-bold text-slate-900">{user?.name || user?.email}</span>
       </p>
-      <form onSubmit={handleSubmit} className="flex flex-col space-y-3">
-        <input
-          type="text"
-          placeholder="Title"
-          className="border rounded px-3 py-2"
-          value={postData.title}
-          onChange={(e) => setPostData({ ...postData, title: e.target.value })}
-        />
-        <textarea
-          placeholder="Message"
-          className="border rounded px-3 py-2"
-          value={postData.message}
-          onChange={(e) => setPostData({ ...postData, message: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Tags (comma separated)"
-          className="border rounded px-3 py-2"
-          value={Array.isArray(postData.tags) ? postData.tags.join(", ") : postData.tags}
-          onChange={(e) => setPostData({ ...postData, tags: e.target.value })}
-        />
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileUpload}
-          className="border rounded px-3 py-2"
-        />
-        {uploading && (
-          <p className="text-xs text-blue-600">Uploading image...</p>
-        )}
-        {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
-        {postData.imageUrl && (
-          <img
-            src={postData.imageUrl}
-            alt="Preview"
-            className="w-full h-40 object-cover rounded"
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="dash-label" htmlFor="title">
+            Title
+          </label>
+          <input
+            id="title"
+            type="text"
+            className="dash-field bg-slate-100"
+            value={postData.title}
+            onChange={(event) =>
+              setPostData({ ...postData, title: event.target.value })
+            }
+            maxLength={120}
+            placeholder="Weekend in the hills"
           />
+        </div>
+
+        <div>
+          <label className="dash-label" htmlFor="message">
+            Message
+          </label>
+          <textarea
+            id="message"
+            className="dash-field min-h-32 resize-y bg-slate-100"
+            value={postData.message}
+            onChange={(event) =>
+              setPostData({ ...postData, message: event.target.value })
+            }
+            maxLength={2000}
+            placeholder="Write what made it worth remembering"
+          />
+        </div>
+
+        <div>
+          <label className="dash-label" htmlFor="tags">
+            Tags
+          </label>
+          <input
+            id="tags"
+            type="text"
+            className="dash-field bg-slate-100"
+            value={postData.tags}
+            onChange={(event) =>
+              setPostData({ ...postData, tags: event.target.value })
+            }
+            placeholder="travel, family, food"
+          />
+        </div>
+
+        <div>
+          <label className="dash-label" htmlFor="image">
+            Image
+          </label>
+          <div className="dash-upload bg-slate-100">
+            <input
+              id="image"
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="bg-slate-100 w-full text-sm font-semibold text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-teal-600 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-teal-700"
+            />
+          </div>
+          {uploading && <p className="dash-hint text-teal-700">Uploading image...</p>}
+          {uploadError && <p className="dash-hint text-rose-600">{uploadError}</p>}
+        </div>
+
+        {postData.imageUrl && (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white p-2">
+            <img
+              src={postData.imageUrl}
+              alt="Preview"
+              className="h-44 w-full rounded-md object-cover"
+            />
+          </div>
         )}
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          Submit
+
+        {submitError && <div className="dash-error">{submitError}</div>}
+
+        <button type="submit" disabled={!canSubmit} className="dash-primary w-full">
+          {isSaving ? "Saving..." : currentId ? "Update memory" : "Create memory"}
         </button>
       </form>
-    </div>
+    </section>
   );
 };
-
 
 export default Form;

@@ -12,7 +12,6 @@ const Signup = ({ onSignup, onSwitch }) => {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({
-    name: false,
     email: false,
     password: false,
     confirmPassword: false,
@@ -23,7 +22,10 @@ const Signup = ({ onSignup, onSwitch }) => {
     return email.length > 3 && email.includes("@") && email.includes(".");
   }, [form.email]);
 
-  const passwordLooksValid = useMemo(() => form.password.length >= 8, [form.password]);
+  const passwordLooksValid = useMemo(
+    () => form.password.length >= 8,
+    [form.password]
+  );
   const passwordsMatch = useMemo(
     () => form.password === form.confirmPassword && form.confirmPassword.length > 0,
     [form.password, form.confirmPassword]
@@ -45,16 +47,18 @@ const Signup = ({ onSignup, onSwitch }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setTouched({ name: true, email: true, password: true, confirmPassword: true });
+    setTouched({ email: true, password: true, confirmPassword: true });
 
     if (!emailLooksValid) {
       setError("Enter a valid email address.");
       return;
     }
+
     if (!passwordLooksValid) {
       setError("Password must be at least 8 characters.");
       return;
     }
+
     if (!passwordsMatch) {
       setError("Passwords do not match.");
       return;
@@ -66,10 +70,20 @@ const Signup = ({ onSignup, onSwitch }) => {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        confirmPassword: form.confirmPassword,
+      });
+      setForm({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
       });
       onSignup({ user: data.user });
     } catch (err) {
+      setForm((prev) => ({
+        ...prev,
+        password: "",
+        confirmPassword: "",
+      }));
       setError(err.response?.data?.message || "Unable to create account.");
     } finally {
       setIsSubmitting(false);
@@ -80,7 +94,7 @@ const Signup = ({ onSignup, onSwitch }) => {
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="name">
+          <label className="auth-label" htmlFor="name">
             Name
           </label>
           <input
@@ -89,15 +103,14 @@ const Signup = ({ onSignup, onSwitch }) => {
             type="text"
             value={form.name}
             onChange={handleChange}
-            onBlur={handleBlur}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="auth-field"
             placeholder="Your name"
             autoComplete="name"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
+          <label className="auth-label" htmlFor="email">
             Email
           </label>
           <input
@@ -107,90 +120,88 @@ const Signup = ({ onSignup, onSwitch }) => {
             value={form.email}
             onChange={handleChange}
             onBlur={handleBlur}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="you@company.com"
+            className="auth-field"
+            placeholder="you@example.com"
             autoComplete="email"
           />
           {touched.email && !emailLooksValid && (
-            <p className="text-xs text-red-500 mt-1">Please enter a valid email.</p>
+            <p className="auth-hint text-rose-600">Please enter a valid email.</p>
           )}
         </div>
 
         <div>
-          <label
-            className="block text-sm font-medium text-gray-700 mb-1"
-            htmlFor="password"
-          >
+          <label className="auth-label" htmlFor="password">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            value={form.password}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Create a password"
-            autoComplete="new-password"
-          />
+          <div className="auth-input-wrap">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={form.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              className="auth-field pr-20"
+              placeholder="Create a password"
+              autoComplete="new-password"
+              maxLength={128}
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           {touched.password && !passwordLooksValid && (
-            <p className="text-xs text-red-500 mt-1">Use at least 8 characters.</p>
+            <p className="auth-hint text-rose-600">Use at least 8 characters.</p>
           )}
         </div>
 
         <div>
-          <label
-            className="block text-sm font-medium text-gray-700 mb-1"
-            htmlFor="confirmPassword"
-          >
+          <label className="auth-label" htmlFor="confirmPassword">
             Confirm password
           </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type={showPassword ? "text" : "password"}
-            value={form.confirmPassword}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Re-enter your password"
-            autoComplete="new-password"
-          />
+          <div className="auth-input-wrap">
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showPassword ? "text" : "password"}
+              value={form.confirmPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              className="auth-field pr-20"
+              placeholder="Re-enter your password"
+              autoComplete="new-password"
+              maxLength={128}
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           {touched.confirmPassword && !passwordsMatch && (
-            <p className="text-xs text-red-500 mt-1">Passwords must match.</p>
+            <p className="auth-hint text-rose-600">Passwords must match.</p>
           )}
         </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="inline-flex items-center gap-2 text-gray-600">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={() => setShowPassword((prev) => !prev)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-200"
-            />
-            Show password
-          </label>
-        </div>
+        {error && <div className="auth-error">{error}</div>}
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
-
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="w-full rounded-lg bg-blue-600 text-white py-2 font-semibold disabled:opacity-60 disabled:cursor-not-allowed hover:bg-blue-700 transition"
-        >
+        <button type="submit" disabled={!canSubmit} className="auth-primary w-full">
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
       </form>
 
-      <div className="mt-6 text-center text-sm text-gray-500">
+      <div className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">
         <span>Already have an account?</span>
         <button
           type="button"
           onClick={onSwitch}
-          className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
+          className="ml-2 font-bold text-teal-700 transition hover:text-teal-900"
         >
           Sign in instead
         </button>
